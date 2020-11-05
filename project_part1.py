@@ -115,7 +115,7 @@ def WAND_Algo(query_terms, top_k, inverted_index):
 
 
     # initiation
-    U = []
+    U = {}
     candidates_set = []
     whole_inverted_index_list = []
     for t in range(0, len(new_inverted_index)):
@@ -123,11 +123,15 @@ def WAND_Algo(query_terms, top_k, inverted_index):
         inverted_index_list = list(new_inverted_index.items())[t][1]
         # whole_inverted_index_list stores all inverted_list [[(1, 2)], [(1, 2), (2, 1), (3, 1)], [(1, 2), (2, 1), (3, 1)]]
         whole_inverted_index_list.append(inverted_index_list)
-        U.append(compute_max_score(inverted_index_list))
+
+        term = list(new_inverted_index.items())[t][0]
+        U[term] = compute_max_score(inverted_index_list)
+
         # add the first posting as candidates
         posting = first_posting(inverted_index_list)
         candidates_set.append(posting)
 
+    print(U)
     # candidates_set [(1, 3), (1, 4), (1, 4)]
 
     threshold = -1  # current threshold initiate to -1
@@ -138,7 +142,10 @@ def WAND_Algo(query_terms, top_k, inverted_index):
         score_limit = 0
         pivot = 0
         while pivot < len(candidates_set) - 1:
-            temp_s_lim = score_limit + U[pivot]
+            term = list(new_inverted_index.items())[pivot][0]
+            print(term)
+            temp_s_lim = score_limit + U.get(term)
+
             if temp_s_lim > threshold:  # if larger than threshold, then will go to line 78
                 break
             score_limit = temp_s_lim
