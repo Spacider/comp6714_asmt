@@ -15,8 +15,6 @@ def compute_max_score(inverted_index):
     return max_score
 
 
-def first_posting(inverted_index_list):
-    return inverted_index_list[0]
 
 
 def delete_smallest(Ans):
@@ -26,28 +24,7 @@ def delete_smallest(Ans):
         if result[0] <= min_result[0]:
             min_result = result
     Ans.remove(min_result)
-    return Ans, min_result[1]
-
-
-# find next candidate that is larger or equal to cpivot
-def seek_to_document(candidates_set, candidate, cmin, whole_inverted_index_list, c_pivot):
-    candidates_set.pop(cmin)
-
-    for index in range(len(whole_inverted_index_list[cmin])):
-        if docID(whole_inverted_index_list[cmin][index]) == docID(candidate):
-            new_candidate = whole_inverted_index_list[cmin][index]
-            while docID(new_candidate) < c_pivot:
-                index += 1
-                if index != len(whole_inverted_index_list[cmin]):
-                    # ensure docID larger or equal to c_pivot
-                    new_candidate = whole_inverted_index_list[cmin][index]
-                    candidates_set.insert(cmin, new_candidate)
-                    break
-                else:
-                    whole_inverted_index_list.pop(cmin)
-                    break
-
-    return whole_inverted_index_list, candidates_set
+    return Ans, min_result[0]
 
 
 def docID(posting):
@@ -58,29 +35,75 @@ def score(posting):
     return posting[1]
 
 
-# if success, choose new candidates_set(choose all pivot version to next)
-def next(candidates_set, whole_inverted_index_list, c_pivot):
-    # candidates_set [(1, 3), (1, 4), (1, 4)]
-    new_candidate_set = []
-    new_whole_inverted_index_list = []
-    for t in range(len(candidates_set)):
-        if docID(candidates_set[t]) == c_pivot:
-            for postings_index in range(len(whole_inverted_index_list[t])):
-                # if docID equal to cpivot, then need to update
-                if docID(whole_inverted_index_list[t][postings_index]) == docID(candidates_set[t]):
-                    # decide whether reach end
-                    if postings_index != len(whole_inverted_index_list[t]) - 1:
-                        # if not reach end, update
-                        # decide thether reach end
-                        if postings_index != len(whole_inverted_index_list[t]):
-                            new_candidate_set.append(whole_inverted_index_list[t][postings_index + 1])
-                            new_whole_inverted_index_list.append(whole_inverted_index_list[t])
-                        break
-        else:
-            new_candidate_set.append(candidates_set[t])
-            new_whole_inverted_index_list.append(whole_inverted_index_list[t])
+def get_term(candidate_set, pivot):
+    return candidate_set[pivot][0]
 
-    return new_whole_inverted_index_list, new_candidate_set
+
+def get_posting(candidate_set, pivot):
+    return candidate_set[pivot][1]
+
+
+def find_posting_from_term(new_inverted_index, candidates_term):
+    for index in new_inverted_index:
+        if index[0] == candidates_term:
+            return index[1]
+
+
+# if success, choose new candidates_set(choose all pivot version to next)
+def next(candidates_set, new_inverted_index, c_pivot):
+    # candidates_set [('Microsoft', (3, 6)) , ('will', (4, 3)), ('Search', (10, 4))]
+    # new_inverted_index :
+    # [('Microsoft', [(3, 6), (7, 6), (15, 3), (20, 6)]),
+    # ('will', [(4, 3), (12, 3), (13, 3), (15, 3), (18, 3)]), ('Search', [(10, 4)])]
+    pop_list = []
+
+    for t in range(len(candidates_set)):
+        # [('will', (12, 3)), ('Microsoft', (15, 3))]
+        # todo  由于 10 4 被pop掉了，导致t 取不到3 ，解决
+        candidates_term = get_term(candidates_set, t)
+        candidate_posting = get_posting(candidates_set, t)
+        if docID(candidate_posting) == c_pivot:
+            # need update
+            new_posting_list = find_posting_from_term(new_inverted_index, candidates_term)
+            for postings_index in range(len(new_posting_list)):
+                # if docID equal to cpivot, then need to update
+                if docID(new_posting_list[postings_index]) == docID(candidate_posting):
+                    # decide whether reach end
+                    if postings_index != len(new_posting_list) - 1:
+                        # not reach end
+                        candidates_set[t] = (candidates_term, new_posting_list[postings_index + 1])
+                    else:
+                        # reach end
+                        pop_list.append(t)
+                    break
+
+    for index in pop_list:
+        candidates_set.pop(index)
+    return candidates_set
+
+
+# find next candidate that is larger or equal to cpivot
+def seek_to_document(candidates_set, index, new_inverted_index, c_pivot):
+
+    candidates_term = get_term(candidates_set, index)
+    candidate_posting = get_posting(candidates_set, index)
+    new_posting_list = find_posting_from_term(new_inverted_index, candidates_term)
+
+    for new_index in range(len(new_posting_list)):
+        if docID(candidate_posting) == docID(new_posting_list[new_index]):
+            while docID(candidate_posting) < c_pivot:
+                new_index += 1
+                if index != len(new_posting_list):
+                    # ensure docID larger or equal to c_pivot
+                    candidate_posting = new_posting_list[index]
+                    candidates_set.append(candidate_posting)
+                else:
+                    # if reach end
+                    candidates_set.pop(index)
+                break
+
+    return candidates_set
+
 
 def sorting_same_score(topk_result):
     # if have same score swap
@@ -110,81 +133,86 @@ def WAND_Algo(query_terms, top_k, inverted_index):
     # index      0                    1                                2
     #       {'President': [(1, 2)], 'New': [(1, 2), (2, 1), (3, 1)], 'York': [(1, 2), (2, 1), (3, 1)]}
     # U          2                    2                                2
-    new_inverted_index = get_new_inverted_index(query_terms, inverted_index)
-    # print(new_inverted_index)
-
+    new_inverted_index = list(get_new_inverted_index(query_terms, inverted_index).items())
+    print(new_inverted_index)
 
     # initiation
     U = {}
-    candidates_set = []
-    whole_inverted_index_list = []
+    candidates_set = {}
     for t in range(0, len(new_inverted_index)):
         # precompute for maximum weight associated with every t, and store in U
-        inverted_index_list = list(new_inverted_index.items())[t][1]
-        # whole_inverted_index_list stores all inverted_list [[(1, 2)], [(1, 2), (2, 1), (3, 1)], [(1, 2), (2, 1), (3, 1)]]
-        whole_inverted_index_list.append(inverted_index_list)
-
-        term = list(new_inverted_index.items())[t][0]
-        U[term] = compute_max_score(inverted_index_list)
-
+        single_posting_list = get_posting(new_inverted_index, t)
+        term = get_term(new_inverted_index, t)
+        U[term] = compute_max_score(single_posting_list)
         # add the first posting as candidates
-        posting = first_posting(inverted_index_list)
-        candidates_set.append(posting)
-
-    print(U)
-    # candidates_set [(1, 3), (1, 4), (1, 4)]
+        candidates_set[term] = single_posting_list[0]
 
     threshold = -1  # current threshold initiate to -1
     Ans = []  # key set of (d, Sd) values
+    # candidates_set {'Microsoft': (3, 6), 'will': (4, 3), 'Search': (10, 4)}
+    candidates_set = list(dict(sorted(candidates_set.items(), key=lambda x: (x[1][0]))).items())
 
     # Finding the pivot
     while len(candidates_set) != 0:
+
+        candidates_set = sorted(candidates_set, key=lambda x: (x[1][0]))
+
+        need_full_score = False
+
         score_limit = 0
         pivot = 0
-        while pivot < len(candidates_set) - 1:
-            term = list(new_inverted_index.items())[pivot][0]
-            print(term)
-            temp_s_lim = score_limit + U.get(term)
+        pivot_term = ""
 
-            if temp_s_lim > threshold:  # if larger than threshold, then will go to line 78
+        while pivot < len(candidates_set):
+            pivot_term = get_term(new_inverted_index, pivot)
+            temp_s_lim = score_limit + U.get(pivot_term)
+
+            if temp_s_lim > threshold:  # if larger than threshold
+                need_full_score = True
                 break
             score_limit = temp_s_lim
             pivot += 1
-        # compute c0 as first element
-        min_posting = candidates_set[0]
-        for c_index in range(1, len(candidates_set)):
-            if docID(candidates_set[c_index]) < docID(min_posting):
-                min_posting = candidates_set[c_index]
 
-        c_0 = docID(min_posting)
-        c_pivot = docID(candidates_set[pivot])
-        if c_0 == c_pivot:
+        if not need_full_score:
+            pivot = pivot - 1
 
-            s = 0  # score document c_pivot
-            t = 0
-            while t < len(candidates_set):
-                # compute full score
-                ct = docID(candidates_set[t])
-                if ct == c_pivot:
-                    s += score(candidates_set[t])  # add contribution to score
-                t += 1
+        c_0 = docID(get_posting(candidates_set, 0))
+        c_pivot = docID(get_posting(candidates_set, pivot))
 
+        if need_full_score:
             full_evaluation_set.add(c_pivot)
             print(full_evaluation_set)
-            if s > threshold:
-                Ans.append((s, c_pivot))
-                if len(Ans) > top_k:
-                    Ans, new_threshold = delete_smallest(Ans)
-                    threshold = new_threshold
-            # choose new candidates_set
-            whole_inverted_index_list, candidates_set = next(candidates_set, whole_inverted_index_list, c_pivot)
 
+            if c_0 == c_pivot:
+
+                s = 0  # score document c_pivot
+                t = 0
+                while t < len(candidates_set):
+                    # compute full score
+                    current_posting = get_posting(candidates_set, t)
+                    ct = docID(current_posting)
+                    if ct == c_pivot:
+                        s += score(current_posting)  # add contribution to score
+                    t += 1
+
+                if s > threshold:
+                    Ans.append((s, c_pivot))
+                    if len(Ans) > top_k:
+                        Ans, new_threshold = delete_smallest(Ans)
+                        threshold = new_threshold
+                # choose new candidates_set
+                candidates_set = next(candidates_set, new_inverted_index, c_pivot)
+
+            else:
+                # all smaller than pivot need to be updated!
+                for index in range(pivot):
+                    candidates_set = seek_to_document(candidates_set, index, new_inverted_index, c_pivot)
+                break
         else:
-            # all smaller than pivot need to be updated!
-            for index in range(0, len(candidates_set)):
-                if docID(candidates_set[index]) < c_pivot:
-                    candidate = candidates_set[index]
-                    whole_inverted_index_list, candidates_set = seek_to_document(candidates_set, candidate, index, whole_inverted_index_list, c_pivot)
+            candidates_set = next(candidates_set, new_inverted_index, c_pivot)
+
+
+
 
     topk_result = sorted(Ans, reverse=True, key=lambda x: x[0])
     topk_result = sorting_same_score(topk_result)

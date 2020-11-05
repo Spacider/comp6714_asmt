@@ -33,7 +33,7 @@ if __name__ == '__main__':
     data = documents
     inverted_index = InvertedIndex(data).get_inverted_index()
     # print(inverted_index)
-    query_terms = ["the", "The", "a", "is"]
+    query_terms = ["the", "Ink"]
     top_k = 3
     print("--------------------------------- test output ---------------------------------")
     topk_result, full_evaluation_count = WAND_Algo(query_terms, top_k, inverted_index)
