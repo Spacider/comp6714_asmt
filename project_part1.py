@@ -19,8 +19,11 @@ def delete_smallest(Ans):
     # Ans (score, docID)
     min_result = Ans[0]
     for result in Ans:
-        if result[0] <= min_result[0]:
+        if result[0] < min_result[0]:
             min_result = result
+        elif result[0] == min_result[0]:
+            if min_result[1] < result[1]:
+                min_result = result
     Ans.remove(min_result)
     return Ans
 
@@ -32,7 +35,6 @@ def smallest_threshold(Ans):
     for item in Ans:
         if item[0] < min_threshold:
             min_threshold = item[0]
-
     return min_threshold
 
 
@@ -60,17 +62,13 @@ def find_posting_from_term(new_inverted_index, candidates_term):
 
 # if success, choose new candidates_set(choose all pivot version to next)
 def next(candidates_set, new_inverted_index, c_pivot):
-    # candidates_set [('Microsoft', (3, 6)) , ('will', (4, 3)), ('Search', (10, 4))]
-    # new_inverted_index :
-    # [('Microsoft', [(3, 6), (7, 6), (15, 3), (20, 6)]),
-    # ('will', [(4, 3), (12, 3), (13, 3), (15, 3), (18, 3)]), ('Search', [(10, 4)])]
     pop_list = []
 
     for t in range(len(candidates_set)):
         # [('will', (12, 3)), ('Microsoft', (15, 3))]
         candidates_term = get_term(candidates_set, t)
         candidate_posting = get_posting(candidates_set, t)
-        if docID(candidate_posting) == c_pivot:
+        if docID(candidate_posting) <= c_pivot:
             # need update
             new_posting_list = find_posting_from_term(new_inverted_index, candidates_term)
             for postings_index in range(len(new_posting_list)):
@@ -132,9 +130,6 @@ def sorting_same_score(topk_result):
 
 
 def WAND_Algo(query_terms, top_k, inverted_index):
-    # initiate various to return
-    # list of (score, doc_id)
-    topk_result = []
     #  the number of documents fully evaluated in WAND algorithm.
     full_evaluation_set = set()
 
@@ -154,7 +149,8 @@ def WAND_Algo(query_terms, top_k, inverted_index):
         term = get_term(new_inverted_index, t)
         U[term] = compute_max_score(single_posting_list)
         # add the first posting as candidates
-        candidates_set[term] = single_posting_list[0]
+        if len(single_posting_list) != 0:
+            candidates_set[term] = single_posting_list[0]
 
     threshold = -1  # current threshold initiate to -1
     Ans = []  # key set of (d, Sd) values
@@ -172,7 +168,7 @@ def WAND_Algo(query_terms, top_k, inverted_index):
         pivot = 0
 
         while pivot < len(candidates_set):
-            pivot_term = get_term(new_inverted_index, pivot)
+            pivot_term = get_term(candidates_set, pivot)
             temp_s_lim = score_limit + U.get(pivot_term)
 
             if temp_s_lim > threshold:  # if larger than threshold
@@ -181,17 +177,12 @@ def WAND_Algo(query_terms, top_k, inverted_index):
             score_limit = temp_s_lim
             pivot += 1
 
-        if not need_full_score:
-            pivot = pivot - 1
-
-        c_0 = docID(get_posting(candidates_set, 0))
-        c_pivot = docID(get_posting(candidates_set, pivot))
-
         if need_full_score:
-            if c_0 == c_pivot:
 
+            c_0 = docID(get_posting(candidates_set, 0))
+            c_pivot = docID(get_posting(candidates_set, pivot))
+            if c_0 == c_pivot:
                 full_evaluation_set.add(c_pivot)
-                # print(full_evaluation_set)
 
                 s = 0  # score document c_pivot
                 t = 0
@@ -216,9 +207,8 @@ def WAND_Algo(query_terms, top_k, inverted_index):
                 # all smaller than pivot need to be updated!
                 for index in range(pivot):
                     candidates_set = seek_to_document(candidates_set, index, new_inverted_index, c_pivot)
-
         else:
-            candidates_set = next(candidates_set, new_inverted_index, c_pivot)
+            candidates_set = next(candidates_set, new_inverted_index, docID(get_posting(candidates_set, len(candidates_set) - 1)))
 
     topk_result = sorted(Ans, reverse=True, key=lambda x: x[0])
     topk_result = sorting_same_score(topk_result)

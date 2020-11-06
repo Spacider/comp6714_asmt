@@ -32,7 +32,12 @@ if __name__ == '__main__':
     # print(data)
     data = documents
     inverted_index = InvertedIndex(data).get_inverted_index()
-    # print(inverted_index)
+    # inverted_index = {
+	# 'A':[],
+	# 'B':[(1, 1)]
+    # }
+    print(inverted_index)
+    # query_terms = ["Microsoft", "will", "Search"]
     query_terms = ["the", "Ink"]
     top_k = 2
     print("--------------------------------- test output ---------------------------------")
